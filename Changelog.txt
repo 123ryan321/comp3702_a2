@@ -1,0 +1,4 @@
+V1.1
+- Removed unused column in small-v1 testcase
+- Added tiny-v1 testcase
+- Added build.xml, an ant build file for outputting a jar file
