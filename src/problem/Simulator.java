@@ -2,36 +2,51 @@ package problem;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 public class Simulator {
+    private Random random = new Random();
 
-	private int currentWeek = 1;
-	private ProblemSpec problemSpec = new ProblemSpec();
-	private ArrayList<Integer> inventory = new ArrayList<Integer>();
-	private ArrayList<ArrayList<Integer>> inventoryHistory =
-			new ArrayList<ArrayList<Integer>>();
-	private ArrayList<ArrayList<Integer>> shoppingHistory =
-			new ArrayList<ArrayList<Integer>>();
-	private ArrayList<Double> penaltyHistory = new ArrayList<Double>();
+	private int currentWeek;
+	private ProblemSpec problemSpec;
+	private ArrayList<Integer> inventory;
+	private ArrayList<List<Integer>> inventoryHistory;
+	private ArrayList<List<Integer>> shoppingHistory;
+	private ArrayList<List<Integer>> userWantsHistory;
+	private ArrayList<Double> penaltyHistory;
 	private double totalPenalty = 0;
-	private double totalMinPenalty = 0;
+	private double totalMaxPenalty = 0;
 	private Fridge fridge;
 	private List<Matrix> probabilities;
 	private boolean verbose = true;
+	
+	/** 
+	 * True if you want the fridge to start off being full, with random
+	 * initial contents.
+	 */
+	public static boolean RANDOM_INITIAL_CONTENTS = false;
 	
 	/**
 	 * Constructor
 	 * @param problemSpecFilename path to input file
 	 * @throws IOException
 	 */
-	public Simulator(String problemSpecFilename) throws IOException {
-		problemSpec.loadInputFile(problemSpecFilename);
+	public Simulator(String problemSpecPath) throws IOException {
+	    this(new ProblemSpec(problemSpecPath));
+	}
+	
+	/**
+	 * Constructor
+	 * @param spec A ProblemSpec
+	 */
+	public Simulator(ProblemSpec spec) {
+	    problemSpec = spec;
 		fridge = problemSpec.getFridge();
 		probabilities = problemSpec.getProbabilities();
-		for (int i = 0; i < fridge.getMaxTypes(); i++) {
-			inventory.add(0);
-		}
+	
+        reset();
 		
 		if (verbose) {
 			System.out.println("Problem spec loaded.");
@@ -40,6 +55,29 @@ public class Simulator {
 					problemSpec.getDiscountFactor());
 			System.out.println("Cost per failure: " + problemSpec.getCost());
 		}
+	}
+	
+	public void reset() {
+	    currentWeek = 1;
+	    inventory = new ArrayList<Integer>();
+	    inventoryHistory = new ArrayList<List<Integer>>();
+	    shoppingHistory = new ArrayList<List<Integer>>();
+	    userWantsHistory = new ArrayList<List<Integer>>();
+	    penaltyHistory = new ArrayList<Double>();
+	    totalPenalty = 0;
+	    totalMaxPenalty = 0;
+	    
+	    for (int i = 0; i < fridge.getMaxTypes(); i++) {
+            inventory.add(0);
+        }
+	    
+	    if (RANDOM_INITIAL_CONTENTS) {
+            for (int i = 0; i < fridge.getCapacity(); i++) {
+                int itemType = random.nextInt(fridge.getMaxTypes());
+                inventory.set(itemType, inventory.get(itemType) + 1);
+            }
+        }
+
 	}
 	
 	/**
@@ -59,12 +97,18 @@ public class Simulator {
 			throw new IllegalArgumentException("Invalid shopping list size");
 		}
 		ArrayList<Integer> tempState = new ArrayList<Integer>(inventory);
+		int totalBought = 0;
 		for (int i = 0; i < shopping.size(); i++) {
+		    totalBought += shopping.get(i);
 			if (shopping.get(i) < 0) {
 				throw new IllegalArgumentException("Negative shopping?");
 			}
 			tempState.set(i, tempState.get(i) + shopping.get(i));
 		}
+		if (totalBought > fridge.getMaxPurchase()) {
+		    throw new IllegalArgumentException("Order too large!");
+		}
+		
 		int sum = 0;
 		for (int i : tempState) {
 			sum += i;
@@ -89,6 +133,9 @@ public class Simulator {
 			}
 		}
 		
+		// Add user wants to history
+		userWantsHistory.add(wants);
+		
 		// Calculate penalty
 		double penalty = problemSpec.getCost() * numFailures;
 		totalPenalty += Math.pow(problemSpec.getDiscountFactor(),
@@ -98,33 +145,40 @@ public class Simulator {
 		for (int i : wants) {
 			wantsSum += i;
 		}
-		int minNumFailures = wantsSum - fridge.getCapacity();
-		if (minNumFailures < 0) {
-			minNumFailures = 0;
-		}
-		double minPenalty = minNumFailures * problemSpec.getCost();
-		totalMinPenalty += Math.pow(problemSpec.getDiscountFactor(),
-				currentWeek - 1) * minPenalty;
+//		int minNumFailures = wantsSum - fridge.getCapacity();
+//		if (minNumFailures < 0) {
+//			minNumFailures = 0;
+//		}
+		int maxNumFailures = (fridge.getMaxItemsPerType() * fridge.getMaxTypes());
+		maxNumFailures -= fridge.getCapacity();
+		double maxPenalty = maxNumFailures * problemSpec.getCost();
+		totalMaxPenalty += Math.pow(problemSpec.getDiscountFactor(),
+				currentWeek - 1) * maxPenalty;
 		
 		if (verbose) {
 			System.out.println();
 			System.out.println("Week " + currentWeek);
 			List<Integer> startInventory = inventoryHistory.get(
 					inventoryHistory.size() - 1);
+			List<Integer> postShopping = new ArrayList<Integer>();
+			for (int i = 0; i < fridge.getMaxTypes(); i++) {
+			    postShopping.add(startInventory.get(i) + shopping.get(i));
+			}
 			System.out.println("Start inventory: " + startInventory);
-			System.out.println("Shopping: " + shopping);
-			System.out.println("User wants: " + wants);
-			System.out.println("End inventory: " + inventory);
+			System.out.println("Shopping:        " + shopping);
+			System.out.println("Post-shopping:   " + postShopping);
+			System.out.println("User wants:      " + wants);
+			System.out.println("End inventory:   " + inventory);
 			System.out.println("Num failures: " + numFailures);
 			System.out.println("Penalty this week: " + penalty);
 			System.out.println("Total penalty: " + totalPenalty);
-			System.out.println("Minimum penalty this week: " + minPenalty);
+			System.out.println("Maximum penalty this week: " + maxPenalty);
 		
 			if (currentWeek == problemSpec.getNumWeeks()) {
 				System.out.println();
-				System.out.println("Total minimum penalty: " + totalMinPenalty);
-				double temp = totalPenalty / totalMinPenalty;
-				System.out.println("Total penalty/total min penalty: " + temp);
+				System.out.println("Total maximum penalty: " + totalMaxPenalty);
+				double temp = totalPenalty / totalMaxPenalty;
+				System.out.println("Total penalty/total max penalty: " + temp);
 			}
 		}	
 		currentWeek ++;	
@@ -154,7 +208,7 @@ public class Simulator {
 	 */
 	public int sampleIndex(List<Double> prob) {
 		double sum = 0;
-		double r = Math.random();
+		double r = random.nextDouble();
 		for (int i = 0; i < prob.size(); i++) {
 			sum += prob.get(i);
 			if (sum >= r) {
@@ -192,6 +246,37 @@ public class Simulator {
 	}
 	
 	/**
+	 * Get inventory from history
+	 * @precondition week < currentWeek
+	 * @param week The week to retrieve. Week starts at 1. 
+	 * @return the inventory for that week.
+	 */
+	public List<Integer> getInventoryAt(int week) {
+	    return inventoryHistory.get(week - 1);
+	}
+	
+	/**
+     * Get shopping list from history
+     * @precondition week < currentWeek
+     * @param week The week to retrieve. Week starts at 1. 
+     * @return the shopping list for that week.
+     */
+	public List<Integer> getShoppingAt(int week) {
+	    return shoppingHistory.get(week - 1);
+	}
+	
+	 /**
+     * Get user request from history
+     * @precondition week < currentWeek
+     * @param week The week to retrieve. Week starts at 1. 
+     * @return the user request for that week.
+     */
+    public List<Integer> getUserRequestAt(int week) {
+        return userWantsHistory.get(week - 1);
+    }
+    
+	
+	/**
 	 * @return the total penalty so far
 	 */
 	public double getTotalPenalty() {
@@ -199,10 +284,10 @@ public class Simulator {
 	}
 	
 	/** 
-	 * @return the total minimum penalty so far
+	 * @return the total maximum penalty so far
 	 */
-	public double getTotalMinPenalty() {
-		return totalMinPenalty;
+	public double getTotalMaxPenalty() {
+		return totalMaxPenalty;
 	}
 
 	public int getCurrentWeek() {

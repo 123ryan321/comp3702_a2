@@ -30,6 +30,14 @@ public class ProblemSpec {
 	/** The probabilities for the user's consumption behaviour */
 	private List<Matrix> probabilities;
 	
+	public ProblemSpec() {
+	}
+	
+	public ProblemSpec(String specFileName) throws IOException {
+	    this();
+	    loadInputFile(specFileName);
+	}
+	
 	/**
 	 * Loads the user's stochastic model from file
 	 * @param filename the path of the text file to load.
@@ -111,11 +119,11 @@ public class ProblemSpec {
 	 * @throws IOException
 	 */
 	public void saveOutput(String filename, double totalPenalty,
-			List<ArrayList<Integer>> history) throws IOException {
+			List<List<Integer>> history) throws IOException {
 		String ls = System.getProperty("line.separator");
 		FileWriter output = new FileWriter(filename);
 		output.write(String.format("%d %s", history.size(), ls));
-		for (ArrayList<Integer> shopping : history) {
+		for (List<Integer> shopping : history) {
 			for (int i : shopping) {
 				output.write(String.format("%d %s", i, ls));
 			}
