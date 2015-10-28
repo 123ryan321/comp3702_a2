@@ -88,7 +88,7 @@ public class ProblemSpec {
 						rowSum += data[i][j];
 					}
 					s.close();
-					if (rowSum != 1) {
+					if (Math.round(rowSum*100000) != 100000) {
 						throw new InputMismatchException(
 								"Row probabilities do not sum to 1.");
 					}

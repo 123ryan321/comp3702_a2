@@ -14,7 +14,7 @@
     <target name="all" depends="compile">
         <jar destfile="./a2-3702.jar" basedir="build/classes">
             <manifest>
-                <attribute name="Main-Class" value="solver.Runner"/>
+                <attribute name="Main-Class" value="solver.MySolver"/>
             </manifest>
         </jar>
     </target>

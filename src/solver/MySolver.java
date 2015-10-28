@@ -21,7 +21,6 @@ public class MySolver implements OrderingAgent {
     
     private List<List<Double>> failProb;		//probability of failures
     private List<Policy> policies;
-//    private List<Policy> goToState;
     private List<List<Policy>>  goToPolicies;
 	
 	
@@ -62,11 +61,11 @@ public class MySolver implements OrderingAgent {
 			}
 			fails.add(val);		
 			
-			System.out.println(pRow);		
+//			System.out.println(pRow);		
 			
 		}
-		System.out.print( "fails: ");
-		System.out.println(fails);
+//		System.out.print( "fails: ");
+//		System.out.println(fails);
 		return fails;
 
 	}
@@ -84,19 +83,20 @@ public class MySolver implements OrderingAgent {
 			
 		}
 	}
-	
+
+//////////////////////// VALUE ITERATION///////////////////////////////
 	/**
 	 * Calculate the expected values for each possible state
 	 */
 	public void calcValues() {
 		
-		System.out.println("calcvals");
+//		System.out.println("calcvals");
 		
 		for (Policy p : policies) {
 			p.value = 0;
 			for (int i  = 0; i < fridge.getMaxTypes(); i ++) {
-				System.out.println(failProb.get(i));
-				System.out.println(p.state.get(i));
+//				System.out.println(failProb.get(i));
+//				System.out.println(p.state.get(i));
 				
 				p.value += failProb.get(i).get(p.state.get(i));
 			}
@@ -142,63 +142,14 @@ public class MySolver implements OrderingAgent {
 		//Get all the expected values
 		calcValues();
 		
-		//display states -- debugging
-		for( Policy P: policies) {
-			System.out.print(P.state);
-			System.out.print(" ");
-			System.out.println(P.value);
-		}
+//		//display states -- debugging
+//		for( Policy P: policies) {
+//			System.out.print(P.state);
+//			System.out.print(" ");
+//			System.out.println(P.value);
+//		}
 	}
 	
-//	/**
-//	 * Calculate the best state to be in for each totNum of items
-//	 */
-//	private void calcBestStates() {
-//		
-//		List<Policy> bestStates = new ArrayList<Policy>();
-//		
-//		//initiate beststates
-//		for (int i = 0; i <= fridge.getCapacity(); i ++) {
-//			bestStates.add(null);
-//		}
-//		
-//		//loop through policy
-//		for (Policy p : policies) {
-//			
-//			Policy bestP = bestStates.get(p.totItems);
-//			
-//			if(bestP == null || p.value < bestP.value) {
-//				bestStates.set(p.totItems, p);
-//			}
-//		}
-//		
-//		//for debug -- print best States
-//		System.out.println();
-//		for(Policy p : bestStates) {
-//			System.out.println(p.value);
-//		}
-//		
-//		//State to move to depending on current number of items
-//		goToState = new ArrayList<Policy>();
-//		for(int i = 0; i < fridge.getCapacity(); i ++) {
-//			//each number of items
-//			goToState.add(bestStates.get(i));
-//			
-//			for (int j = i; j <= Math.min(i + fridge.getMaxPurchase(), fridge.getCapacity()); j ++) {
-//				//every number possible to purchase to
-//				if(bestStates.get(j).value < goToState.get(i).value) {
-//					goToState.set(i, bestStates.get(j));
-//				}
-//			}
-//		}
-//		
-//		//for debug -- print goToStates
-//		System.out.println();
-//		for(Policy p : goToState) {
-//			System.out.println(p.value);
-//		}
-//		
-//	}
 	
 	private void sortStates() {
 		
@@ -236,14 +187,14 @@ public class MySolver implements OrderingAgent {
 			
 		}
 		
-		//Debug -- display 
-		for(List<Policy> l : goToPolicies) {
-			System.out.println();
-			for(Policy p: l) {
-				System.out.print(p.state);
-				System.out.println(p.value);
-			}
-		}
+//		//Debug -- display 
+//		for(List<Policy> l : goToPolicies) {
+//			System.out.println();
+//			for(Policy p: l) {
+//				System.out.print(p.state);
+//				System.out.println(p.value);
+//			}
+//		}
 		
 	}
 	
@@ -296,6 +247,62 @@ public class MySolver implements OrderingAgent {
 		}
 	}
 	
+
+	
+	
+/////////////////////////// Monte Carlo ////////////////////////////////////////
+	
+	
+	public List<Integer> monteCarlo(List<Integer> inventory) {
+		System.out.println(inventory);
+		List<Integer> maxOrder = new ArrayList<Integer>();
+		
+		int totItems = 0;
+		
+		for(Integer i : inventory){
+			int val = Math.min(fridge.getMaxItemsPerType() - i, fridge.getMaxPurchase());
+			maxOrder.add(val);
+			
+			totItems += i;
+		}
+//		System.out.println(maxOrder);
+
+		
+		TreeNode root = new TreeNode(failProb, maxOrder, fridge.getMaxTypes(), fridge.getMaxPurchase(), fridge.getCapacity(), totItems);
+//		System.out.println(root);
+		
+		Timer time = new Timer();
+		
+		while(time.elapsed() < 10000) {
+			root.selectAction();
+		}
+		
+//		List<Integer> tmp = new ArrayList<Integer>();
+//		tmp.add(0); tmp.add(0); tmp.add(0);
+//		
+//		return tmp;
+//
+		return root.bestPath();
+		
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	public MySolver(ProblemSpec spec) throws IOException {
 	    this.spec = spec;
@@ -307,21 +314,23 @@ public class MySolver implements OrderingAgent {
 	
 	public void doOfflineComputation() {
 		generateFailProb();
-		populateStates();
 		
-		sortStates();
-		
-//		calcBestStates();
-		generateAction();
-		
-		//for debug -- print policies
-		System.out.println();
-		for(Policy p : policies) {
-			System.out.print(p.state);
-			System.out.print(p.action);
-			System.out.print(p.finalState);
-			System.out.println(p.expectedFails);
+		if (fridge.getCapacity() < 8) {
+			// smaller fridges
+			populateStates();
+			sortStates();
+			generateAction();
 		}
+
+//		
+//		//for debug -- print policies
+//		System.out.println();
+//		for(Policy p : policies) {
+//			System.out.print(p.state);
+//			System.out.print(p.action);
+//			System.out.print(p.finalState);
+//			System.out.println(p.expectedFails);
+//		}
 		
 		
 	   
@@ -329,28 +338,16 @@ public class MySolver implements OrderingAgent {
 	
 	public List<Integer> generateShoppingList(List<Integer> inventory,
 	        int numWeeksLeft) {
-		// Example code that buys one of each item type.
-        // TODO Replace this with your own code.
-//		
-//		List<Integer> shopping = new ArrayList<Integer>();
-//		int totalItems = 0;
-//		for (int i : inventory) {
-//			totalItems += i;
-//		}
-//		
-//		int totalShopping = 0;
-//		for (int i = 0; i < fridge.getMaxTypes(); i++) {
-//			if (totalItems >= fridge.getCapacity() || 
-//			        totalShopping >= fridge.getMaxPurchase()) {
-//				shopping.add(0);
-//			} else {
-//				shopping.add(1);
-//				totalShopping ++;
-//				totalItems ++;
-//			}
-//		}
-//		
-		return getPolicy(inventory).action;
+
+		
+		if (fridge.getCapacity() < 8) {
+			//tiny, small & medium
+			return getPolicy(inventory).action;
+		} else {
+			return monteCarlo(inventory);
+		}
+		
+		
 		
 		
 	}
